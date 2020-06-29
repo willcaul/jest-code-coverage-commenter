@@ -1,6 +1,9 @@
 import table from "markdown-table";
 import path from "path";
 import istanbulCoverage from "istanbul-lib-coverage";
+import { argv } from "yargs";
+
+const rootPath = (argv.rootPath as string) || process.cwd();
 
 type File = {
     relative: string;
@@ -24,7 +27,7 @@ function generateCoverageTable(coverageMap: istanbulCoverage.CoverageMap) {
     ];
 
     const parseFile = (absolute: string) => {
-        const relative = path.relative(process.cwd(), absolute);
+        const relative = path.relative(rootPath, absolute);
         const fileName = path.basename(relative);
         const p = path.dirname(relative);
         const coverage = coverageMap.fileCoverageFor(absolute).toSummary();

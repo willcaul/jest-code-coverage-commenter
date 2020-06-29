@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateCommentBody = void 0;
 const markdown_table_1 = __importDefault(require("markdown-table"));
 const path_1 = __importDefault(require("path"));
+const yargs_1 = require("yargs");
+const rootPath = yargs_1.argv.rootPath || process.cwd();
 function generateCommentBody(coverageMap) {
     const header = "## Code Coverage\n";
     const coverageTable = generateCoverageTable(coverageMap);
@@ -20,7 +22,7 @@ function generateCoverageTable(coverageMap) {
         formatIfPoor(f.lines.pct),
     ];
     const parseFile = (absolute) => {
-        const relative = path_1.default.relative(process.cwd(), absolute);
+        const relative = path_1.default.relative(rootPath, absolute);
         const fileName = path_1.default.basename(relative);
         const p = path_1.default.dirname(relative);
         const coverage = coverageMap.fileCoverageFor(absolute).toSummary();
