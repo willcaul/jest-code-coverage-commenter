@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateCommentBody = void 0;
 const markdown_table_1 = __importDefault(require("markdown-table"));
 const path_1 = __importDefault(require("path"));
+const istanbul_lib_coverage_1 = require("istanbul-lib-coverage");
 const yargs_1 = require("yargs");
 const rootPath = yargs_1.argv.rootPath || process.cwd();
 function generateCommentBody(coverageMap) {
@@ -40,13 +41,14 @@ function generateCoverageTable(coverageMap) {
     const summaryRow = ["**All**", ...summaryToRow(summary)];
     const files = coverageMap.files().map(parseFile).reduce(groupByPath, {});
     const rows = Object.entries(files)
-        .map(([dir, files]) => [
-        [` **${dir}**`, "", "", "", ""],
-        ...files.map((file) => {
-            const name = `\`${file.fileName}\``;
-            return [`  ${name}`, ...summaryToRow(file.coverage)];
-        }),
-    ])
+        .map(([dir, files]) => {
+        const dirMap = istanbul_lib_coverage_1.createCoverageMap(Object.assign({}, coverageMap.data));
+        dirMap.filter((key) => parseFile(key).relative.startsWith(dir));
+        return [
+            [` **${dir}**`, ...summaryToRow(dirMap.getCoverageSummary())],
+            ...files.map((file) => [`  \`${file.fileName}\``, ...summaryToRow(file.coverage)]),
+        ];
+    })
         .flat();
     return markdown_table_1.default([header, summaryRow, ...rows], { align: ["l", "r", "r", "r", "r"] });
 }

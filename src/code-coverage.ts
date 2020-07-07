@@ -1,6 +1,6 @@
 import table from "markdown-table";
 import path from "path";
-import istanbulCoverage from "istanbul-lib-coverage";
+import { CoverageSummary, Totals, CoverageMap, createCoverageMap } from "istanbul-lib-coverage";
 import { argv } from "yargs";
 
 const rootPath = (argv.rootPath as string) || process.cwd();
@@ -9,17 +9,17 @@ type File = {
     relative: string;
     fileName: string;
     path: string;
-    coverage: istanbulCoverage.CoverageSummary;
+    coverage: CoverageSummary;
 };
 
-export function generateCommentBody(coverageMap: istanbulCoverage.CoverageMap) {
+export function generateCommentBody(coverageMap: CoverageMap) {
     const header = "## Code Coverage\n";
     const coverageTable = generateCoverageTable(coverageMap);
     return header + coverageTable;
 }
 
-function generateCoverageTable(coverageMap: istanbulCoverage.CoverageMap) {
-    const summaryToRow = (f: istanbulCoverage.CoverageSummary) => [
+function generateCoverageTable(coverageMap: CoverageMap) {
+    const summaryToRow = (f: CoverageSummary) => [
         formatIfPoor(f.statements.pct!),
         formatIfPoor(f.branches.pct!),
         formatIfPoor(f.functions.pct!),
@@ -45,19 +45,21 @@ function generateCoverageTable(coverageMap: istanbulCoverage.CoverageMap) {
     };
 
     const header = ["File", "% Statements", "% Branch", "% Funcs", "% Lines"];
-    const summary = (coverageMap.getCoverageSummary() as unknown) as istanbulCoverage.CoverageSummary;
+    const summary = (coverageMap.getCoverageSummary() as unknown) as CoverageSummary;
     const summaryRow = ["**All**", ...summaryToRow(summary)];
 
     const files = coverageMap.files().map(parseFile).reduce(groupByPath, {});
 
     const rows = Object.entries(files)
-        .map(([dir, files]) => [
-            [` **${dir}**`, "", "", "", ""], // Add metrics for directories by summing files
-            ...files.map((file) => {
-                const name = `\`${file.fileName}\``;
-                return [`  ${name}`, ...summaryToRow(file.coverage)];
-            }),
-        ])
+        .map(([dir, files]) => {
+            const dirMap = createCoverageMap(Object.assign({}, coverageMap.data));
+            dirMap.filter((key) => parseFile(key).relative.startsWith(dir));
+
+            return [
+                [` **${dir}**`, ...summaryToRow(dirMap.getCoverageSummary())],
+                ...files.map((file) => [`  \`${file.fileName}\``, ...summaryToRow(file.coverage)]),
+            ];
+        })
         .flat();
 
     return table([header, summaryRow, ...rows], { align: ["l", "r", "r", "r", "r"] });
