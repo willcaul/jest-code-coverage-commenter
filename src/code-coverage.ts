@@ -1,7 +1,8 @@
-import table from "markdown-table";
 import path from "path";
 import istanbulCoverage from "istanbul-lib-coverage";
 import { argv } from "yargs";
+import { toHTMLTable } from "./html";
+import { truncateLeft } from "./util";
 
 const rootPath = (argv.rootPath as string) || process.cwd();
 
@@ -12,13 +13,23 @@ type File = {
     coverage: istanbulCoverage.CoverageSummary;
 };
 
-export function generateCommentBody(coverageMap: istanbulCoverage.CoverageMap) {
-    const header = "## Code Coverage\n";
-    const coverageTable = generateCoverageTable(coverageMap);
-    return header + coverageTable;
+export function generateCommentBody(coverageMap: istanbulCoverage.CoverageMap): string {
+    const {summaryTable, fullTable} = generateCoverageTable(coverageMap);
+    const lines: string[] = [
+        "# Code Coverage :mag_right:",
+        summaryTable,
+        "", // Add empty line to make sure header still renders correctly
+        "## Full overview",
+        '<details>',
+        '<summary>Click to expand</summary>\n',
+        fullTable,
+        '</details>'
+    ];
+
+    return lines.join("\n");
 }
 
-function generateCoverageTable(coverageMap: istanbulCoverage.CoverageMap) {
+function generateCoverageTable(coverageMap: istanbulCoverage.CoverageMap): {summaryTable: string; fullTable: string;} {
     const summaryToRow = (f: istanbulCoverage.CoverageSummary) => [
         formatIfPoor(f.statements.pct!),
         formatIfPoor(f.branches.pct!),
@@ -44,23 +55,27 @@ function generateCoverageTable(coverageMap: istanbulCoverage.CoverageMap) {
         return dirs;
     };
 
-    const header = ["File", "% Statements", "% Branch", "% Funcs", "% Lines"];
-    const summary = (coverageMap.getCoverageSummary() as unknown) as istanbulCoverage.CoverageSummary;
-    const summaryRow = ["**All**", ...summaryToRow(summary)];
+    const headers = ["% Statements", "% Branch", "% Funcs", "% Lines"];
+    const summary = summaryToRow(coverageMap.getCoverageSummary());
 
     const files = coverageMap.files().map(parseFile).reduce(groupByPath, {});
 
     const rows = Object.entries(files)
         .map(([dir, files]) => [
-            [` **${dir}**`, "", "", "", ""], // Add metrics for directories by summing files
-            ...files.map((file) => {
-                const name = `\`${file.fileName}\``;
-                return [`  ${name}`, ...summaryToRow(file.coverage)];
-            }),
+            [`<b>${truncateLeft(dir, 50)}</b>`, "", "", "", ""], // Add metrics for directories by summing files
+            ...files.map((file) => ([
+                `<code>${file.fileName}</code>`,
+                ...summaryToRow(file.coverage)
+            ])),
         ])
         .flat();
 
-    return table([header, summaryRow, ...rows], { align: ["l", "r", "r", "r", "r"] });
+    const fullHeaders = ["File", ...headers];
+
+    const summaryTable = toHTMLTable(headers, [summary]);
+    const fullTable = toHTMLTable(fullHeaders, rows);
+
+    return {summaryTable, fullTable};
 }
 
 function formatIfPoor(number: number): string {
