@@ -4,14 +4,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateCommentBody = void 0;
-const markdown_table_1 = __importDefault(require("markdown-table"));
 const path_1 = __importDefault(require("path"));
 const yargs_1 = require("yargs");
+const html_1 = require("./html");
+const util_1 = require("./util");
 const rootPath = yargs_1.argv.rootPath || process.cwd();
 function generateCommentBody(coverageMap) {
-    const header = "## Code Coverage\n";
-    const coverageTable = generateCoverageTable(coverageMap);
-    return header + coverageTable;
+    const { summaryTable, fullTable } = generateCoverageTable(coverageMap);
+    const lines = [
+        "# Code Coverage :mag_right:",
+        summaryTable,
+        "",
+        "## Full overview",
+        '<details>',
+        '<summary>Click to expand</summary>\n',
+        fullTable,
+        '</details>'
+    ];
+    return lines.join("\n");
 }
 exports.generateCommentBody = generateCommentBody;
 function generateCoverageTable(coverageMap) {
@@ -35,20 +45,22 @@ function generateCoverageTable(coverageMap) {
         dirs[file.path].push(file);
         return dirs;
     };
-    const header = ["File", "% Statements", "% Branch", "% Funcs", "% Lines"];
-    const summary = coverageMap.getCoverageSummary();
-    const summaryRow = ["**All**", ...summaryToRow(summary)];
+    const headers = ["% Statements", "% Branch", "% Funcs", "% Lines"];
+    const summary = summaryToRow(coverageMap.getCoverageSummary());
     const files = coverageMap.files().map(parseFile).reduce(groupByPath, {});
     const rows = Object.entries(files)
         .map(([dir, files]) => [
-        [` **${dir}**`, "", "", "", ""],
-        ...files.map((file) => {
-            const name = `\`${file.fileName}\``;
-            return [`  ${name}`, ...summaryToRow(file.coverage)];
-        }),
+        [`<b>${util_1.truncateLeft(dir, 50)}</b>`, "", "", "", ""],
+        ...files.map((file) => ([
+            `<code>${file.fileName}</code>`,
+            ...summaryToRow(file.coverage)
+        ])),
     ])
         .flat();
-    return markdown_table_1.default([header, summaryRow, ...rows], { align: ["l", "r", "r", "r", "r"] });
+    const fullHeaders = ["File", ...headers];
+    const summaryTable = html_1.toHTMLTable(headers, [summary]);
+    const fullTable = html_1.toHTMLTable(fullHeaders, rows);
+    return { summaryTable, fullTable };
 }
 function formatIfPoor(number) {
     if (number > 90) {
